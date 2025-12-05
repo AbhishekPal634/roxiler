@@ -47,39 +47,46 @@ exports.createUser = async (req, res) => {
  */
 exports.createStore = async (req, res) => {
   try {
-    const { name, email, address, owner_id } = req.body;
+    const { name, email, address, password } = req.body;
 
-    // Verify owner exists and is a store_owner
-    const owner = await User.findById(owner_id);
-    if (!owner) {
-      return res.status(404).json({
-        success: false,
-        message: "Owner not found",
-      });
-    }
-
-    if (owner.role !== "store_owner") {
+    // Check if email already exists
+    const existingUser = await User.findByEmail(email);
+    if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: "Owner must have store_owner role",
+        message: "Email already exists",
       });
     }
 
-    // Check if owner already has a store
-    const existingStore = await Store.findByOwnerId(owner_id);
-    if (existingStore) {
-      return res.status(400).json({
-        success: false,
-        message: "This store owner already has a store",
-      });
-    }
+    // Create store owner user with auto-generated name
+    const ownerName = `${name} Owner`;
+    const owner = await User.create({
+      name: ownerName,
+      email,
+      address,
+      password,
+      role: "store_owner",
+    });
 
-    const store = await Store.create({ name, email, address, owner_id });
+    // Create store linked to the new owner
+    const store = await Store.create({
+      name,
+      email,
+      address,
+      owner_id: owner.id,
+    });
 
     res.status(201).json({
       success: true,
       message: "Store created successfully",
-      data: store,
+      data: {
+        store,
+        credentials: {
+          email: owner.email,
+          password: password, // Return plain password for admin to share
+          name: owner.name,
+        },
+      },
     });
   } catch (error) {
     console.error("Error creating store:", error);

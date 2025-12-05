@@ -6,6 +6,7 @@ const authRoutes = require("./routes/auth");
 const adminRoutes = require("./routes/admin");
 const userRoutes = require("./routes/user");
 const storeOwnerRoutes = require("./routes/storeOwner");
+const pool = require("./database/config");
 
 const app = express();
 
@@ -54,6 +55,17 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Test database connection on startup
+pool.query("SELECT NOW()", (err, res) => {
+  if (err) {
+    console.error("Database connection failed:", err.message);
+    console.error("Please check your database configuration in .env file");
+  } else {
+    console.log("Database connected successfully");
+    console.log(`   Database time: ${res.rows[0].now}`);
+  }
+});
 
 app.listen(PORT, () => {
   console.log("=".repeat(50));

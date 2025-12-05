@@ -91,6 +91,65 @@ class Store {
     );
     return result.rows;
   }
+
+  static async getOwnerDashboard(ownerId) {
+    // Get store details with ratings
+    const storeResult = await pool.query(
+      `SELECT 
+        s.id,
+        s.name,
+        s.email,
+        s.address,
+        s.created_at,
+        COALESCE(AVG(r.rating), 0) as average_rating,
+        COUNT(r.id) as total_ratings
+      FROM stores s
+      LEFT JOIN ratings r ON s.id = r.store_id
+      WHERE s.owner_id = $1
+      GROUP BY s.id`,
+      [ownerId]
+    );
+
+    if (storeResult.rows.length === 0) {
+      return null;
+    }
+
+    const store = storeResult.rows[0];
+
+    // Get ratings from users
+    const ratingsResult = await pool.query(
+      `SELECT 
+        r.id as rating_id,
+        r.rating,
+        r.created_at as submitted_at,
+        u.name as user_name,
+        u.email as user_email
+      FROM ratings r
+      JOIN users u ON r.user_id = u.id
+      WHERE r.store_id = $1
+      ORDER BY r.created_at DESC`,
+      [store.id]
+    );
+
+    return {
+      store: {
+        id: store.id,
+        name: store.name,
+        email: store.email,
+        address: store.address,
+        averageRating: parseFloat(store.average_rating).toFixed(1),
+        totalRatings: parseInt(store.total_ratings),
+        createdAt: store.created_at,
+      },
+      ratingsFromUsers: ratingsResult.rows.map((r) => ({
+        ratingId: r.rating_id,
+        rating: r.rating,
+        submittedAt: r.submitted_at,
+        userName: r.user_name,
+        userEmail: r.user_email,
+      })),
+    };
+  }
 }
 
 module.exports = Store;

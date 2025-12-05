@@ -122,9 +122,13 @@ const storeValidationRules = {
       .isLength({ max: 400 })
       .withMessage("Address must not exceed 400 characters"),
 
-    body("owner_id")
-      .isInt({ min: 1 })
-      .withMessage("Valid owner ID is required"),
+    body("password")
+      .isLength({ min: 8, max: 16 })
+      .withMessage("Password must be 8-16 characters long")
+      .matches(/[A-Z]/)
+      .withMessage("Password must contain at least one uppercase letter")
+      .matches(/[!@#$%^&*(),.?":{}|<>]/)
+      .withMessage("Password must contain at least one special character"),
   ],
 };
 
