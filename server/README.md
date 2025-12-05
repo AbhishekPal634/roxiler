@@ -1,31 +1,33 @@
-# Roxiler Backend API
+# Store Rating Platform - Backend API
 
-A role-based rating platform backend built with Node.js, Express.js, and PostgreSQL.
+A robust, role-based store rating platform backend built with Node.js, Express.js, and PostgreSQL with AWS RDS support.
 
 ## Features
 
 - **JWT Authentication** with role-based access control
 - **Three User Roles**: Admin, Normal User, Store Owner
-- **Secure Password Handling**: bcrypt hashing with validation
-- **Database Best Practices**: Indexing, foreign keys, normalization
-- **Input Validation**: Comprehensive validation for all inputs
-- **Token Invalidation**: Logout functionality with token blacklisting
+- **Secure Password Handling**: bcrypt hashing with comprehensive validation
+- **Input Validation**: Express-validator for all endpoints
+- **Token Invalidation**: Secure logout with token blacklisting
+- **Advanced Querying**: Filtering, sorting, and search across all resources
+- **Cloud Ready**: AWS RDS PostgreSQL support with SSL configuration
 
 ## Tech Stack
 
-- Node.js
-- Express.js
-- PostgreSQL
-- JWT (JSON Web Tokens)
-- bcryptjs
-- express-validator
+- **Node.js** - JavaScript runtime
+- **Express.js** - Web application framework
+- **PostgreSQL** - Relational database (local or AWS RDS)
+- **JWT** - JSON Web Tokens for authentication
+- **bcryptjs** - Password hashing
+- **express-validator** - Input validation middleware
+- **pg** - PostgreSQL client with connection pooling
 
 ## Setup Instructions
 
 ### 1. Prerequisites
 
 - Node.js (v14 or higher)
-- PostgreSQL (v12 or higher)
+- PostgreSQL (v12 or higher) - Local or AWS RDS instance
 
 ### 2. Install Dependencies
 
@@ -35,76 +37,88 @@ npm install
 
 ### 3. Environment Configuration
 
-Create a `.env` file in the root directory:
-
-```bash
-cp .env.example .env
-```
-
-Update the `.env` file with your database credentials:
+Create a `.env` file in the server directory:
 
 ```env
-PORT=5000
+PORT=3000
+
+# Database Configuration (Local PostgreSQL)
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=roxiler_db
+DB_NAME=store_rating_db
 DB_USER=postgres
 DB_PASSWORD=your_password
 
-JWT_SECRET=your_super_secret_jwt_key_here_change_in_production
+# Database Configuration (AWS RDS - Alternative)
+# DB_HOST=your-rds-endpoint.region.rds.amazonaws.com
+# DB_PORT=5432
+# DB_NAME=store_rating_db
+# DB_USER=postgres
+# DB_PASSWORD=your_rds_password
+
+# JWT Configuration
+JWT_SECRET=your_super_secret_jwt_key_change_in_production
 JWT_EXPIRES_IN=24h
 ```
 
+**Important Notes:**
+
+- Change `JWT_SECRET` to a secure random string in production
+- For AWS RDS, ensure Security Group allows inbound connections on port 5432
+- SSL is automatically configured for remote database connections
+
 ### 4. Database Setup
 
-First, create the database in PostgreSQL:
-
-```sql
-CREATE DATABASE roxiler_db;
-```
-
-Then initialize the database tables and seed default admin:
+Initialize the database tables and create default admin user:
 
 ```bash
-npm run init-db
+node src/database/init.js
 ```
 
-**Default Admin Credentials:**
+This will:
 
-- Email: `admin@roxiler.com`
-- Password: `Admin@123`
+- Create all necessary tables (users, stores, ratings)
+- Set up indexes and foreign key constraints
+- Create a default admin account
+- Create a database view for stores with ratings
 
 ### 5. Start the Server
 
-Development mode (with auto-reload):
-
-```bash
-npm run dev
-```
-
-Production mode:
+Development mode:
 
 ```bash
 npm start
 ```
 
-The server will start on `http://localhost:5000`
+The server will start on `http://localhost:3000`
+
+**Health Check:**
+
+```
+GET http://localhost:3000/health
+```
 
 ## API Documentation
 
+### Base URL
+
+```
+http://localhost:3000/api
+```
+
 ### Authentication
 
-All API endpoints (except signup and login) require a JWT token in the Authorization header:
+All protected endpoints require a JWT token in the Authorization header:
 
 ```
 Authorization: Bearer <your_jwt_token>
 ```
 
-### Common Login Endpoint
+### Unified Login Endpoint
 
 **POST** `/api/auth/login`
 
-Login for all user types (Admin, User, Store Owner)
+Universal login endpoint for all user types (Admin, User, Store Owner)
 
 **Request Body:**
 
@@ -167,16 +181,27 @@ Authorization: Bearer <admin_token>
 
 **POST** `/api/admin/stores`
 
+Creates a new store and automatically generates a store owner account.
+
 **Request Body:**
 
 ```json
 {
-  "name": "My Awesome Store",
-  "email": "store@example.com",
-  "address": "456 Store Avenue, City, State, ZIP",
-  "owner_id": 2
+  "storeName": "My Awesome Store",
+  "storeEmail": "store@example.com",
+  "storeAddress": "456 Store Avenue, City, State, ZIP",
+  "ownerName": "Store Owner Full Name Here",
+  "ownerEmail": "owner@example.com",
+  "ownerPassword": "Password@123",
+  "ownerAddress": "789 Owner Street, City, State, ZIP"
 }
 ```
+
+**Notes:**
+
+- Automatically creates a store owner user account
+- Owner name is padded to minimum 20 characters if needed
+- Owner account credentials should be shared with the store owner
 
 ### 3. Dashboard Statistics
 
@@ -355,24 +380,15 @@ Base URL: `/api/store-owner`
 Authorization: Bearer <owner_token>
 ```
 
-**Request Body:**
-
-```json
-{
-  "currentPassword": "Password@123",
-  "newPassword": "NewPassword@456"
-}
-```
-
 ### 3. Dashboard
 
 **GET** `/api/store-owner/dashboard`
 
-Get store information and list of users who rated the store.
+Get store information, statistics, and list of users who rated the store.
 
 **Response:**
 
-```json
+````json
 {
   "success": true,
   "data": {
@@ -381,13 +397,22 @@ Get store information and list of users who rated the store.
       "name": "My Store",
       "email": "store@example.com",
       "address": "Store Address",
-      "averageRating": "4.50",
-      "totalRatings": 10
+      "averageRating": "4.5",
+      "totalRatings": 10,
+      "createdAt": "2025-12-01T10:00:00Z"
     },
     "ratingsFromUsers": [
       {
         "ratingId": 1,
-        "userId": 5,
+        "userName": "John Doe Long Name",
+        "userEmail": "user@example.com",
+        "rating": 5,
+        "submittedAt": "2025-12-01T10:00:00Z"
+      }
+    ]
+  }
+}
+```     "userId": 5,
         "userName": "User Name",
         "userEmail": "user@example.com",
         "rating": 5,
@@ -397,7 +422,7 @@ Get store information and list of users who rated the store.
     ]
   }
 }
-```
+````
 
 ### 4. Logout
 
@@ -407,48 +432,164 @@ Get store information and list of users who rated the store.
 
 ## Database Schema
 
+## Database Schema
+
 ### Users Table
 
-- `id` (Primary Key)
-- `name` (20-60 chars)
-- `email` (unique)
-- `password` (hashed)
-- `address` (max 400 chars)
-- `role` (admin | user | store_owner)
-- `created_at`, `updated_at`
+```sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(60) NOT NULL CHECK (length(name) >= 20 AND length(name) <= 60),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  address VARCHAR(400) NOT NULL,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'user', 'store_owner')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Constraints:**
+
+- Name: 20-60 characters
+- Email: Unique, valid format
+- Role: admin | user | store_owner
 
 **Indexes:** email, role
 
 ### Stores Table
 
-- `id` (Primary Key)
-- `name`
-- `email`
-- `address`
-- `owner_id` (Foreign Key → users.id)
-- `created_at`, `updated_at`
-
-**Indexes:** name, address, owner_id
-
-### Ratings Table
-
-- `id` (Primary Key)
-- `user_id` (Foreign Key → users.id)
-- `store_id` (Foreign Key → stores.id)
-- `rating` (1-5)
-- `created_at`, `updated_at`
-
-**Unique Constraint:** (user_id, store_id)
-**Indexes:** store_id, user_id
-
+```sql
+CREATE TABLE stores (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  address VARCHAR(400) NOT NULL,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ## Security Features
 
-1. **Password Hashing**: All passwords are hashed using bcryptjs
-2. **JWT Authentication**: Secure token-based authentication
+1. **Password Hashing**: All passwords are hashed using bcryptjs with salt rounds
+2. **JWT Authentication**: Secure token-based authentication with configurable expiration
 3. **Input Validation**: Comprehensive validation using express-validator
+   - Name: 20-60 characters
+   - Password: 8-16 characters with uppercase and special character
+   - Email: Valid format validation
+   - Address: Maximum 400 characters
 4. **SQL Injection Prevention**: Parameterized queries with pg library
-5. **Role-Based Access Control**: Middleware-based authorization
-6. **Token Blacklisting**: Logout functionality with invalidated tokens
+5. **Role-Based Access Control**: Middleware-based authorization for all protected routes
+6. **Token Blacklisting**: Secure logout functionality with invalidated tokens
+7. **SSL/TLS Support**: Automatic SSL configuration for remote database connections
+8. **Database Constraints**: CHECK constraints on ratings (1-5) and roles
+9. **Foreign Key Cascades**: Proper cleanup on user/store deletion
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, store_id)
+);
+```
+
+**Constraints:**
+
+- Rating: 1-5 (integer)
+- One rating per user per store
+
+**Indexes:** store_id, user_id
+
+## Project Structure
+
+```
+src/
+├── server.js              # Express app configuration and startup
+├── controllers/           # Business logic for each domain
+│   ├── adminController.js
+│   ├── authController.js
+│   ├── storeOwnerController.js
+│   └── userController.js
+├── database/
+│   ├── config.js         # PostgreSQL connection pool with SSL
+│   └── init.js           # Database initialization script
+├── middleware/
+│   ├── auth.js           # JWT authentication and authorization
+│   └── validation.js     # Input validation rules
+├── models/               # Database models and queries
+│   ├── Rating.js
+│   ├── Store.js
+│   └── User.js
+├── routes/               # API route definitions
+│   ├── admin.js
+│   ├── auth.js
+│   ├── storeOwner.js
+│   └── user.js
+└── utils/
+    ├── jwt.js            # JWT token generation
+    └── tokenBlacklist.js # Token invalidation tracking
+```
+
+## Architecture
+
+- **MVC Pattern**: Separation of routes, controllers, and models
+- **Middleware Chain**: Authentication → Authorization → Validation → Controller
+- **Connection Pooling**: Efficient database connection management
+- **Error Handling**: Consistent error responses across all endpoints
+- **Modular Design**: Easy to extend with new features
+
+## AWS RDS Deployment Notes
+
+When using AWS RDS PostgreSQL:
+
+1. **Security Group**: Configure inbound rule for PostgreSQL (port 5432)
+2. **SSL/TLS**: Automatically enabled in `config.js` for remote connections
+3. **Connection String**: Use RDS endpoint as `DB_HOST` in `.env`
+4. **Publicly Accessible**: Enable if connecting from local development
+5. **Parameter Groups**: Default settings work well for this application
+
+## Testing
+
+Test the API using:
+
+- **Postman** - Full-featured API testing
+- **Thunder Client** - VS Code extension
+- **cURL** - Command-line testing
+
+Example cURL request:
+
+```bash
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"Admin@123"}'
+```
+
+## Troubleshooting
+
+### Database Connection Issues
+
+- Verify PostgreSQL is running
+- Check `.env` credentials are correct
+- For AWS RDS, verify Security Group allows your IP
+- Check SSL configuration for remote databases
+
+### Authentication Errors
+
+- Ensure JWT_SECRET is set in `.env`
+- Verify token format: `Bearer <token>`
+- Check token hasn't been blacklisted after logout
+
+### Validation Errors
+
+- Name must be 20-60 characters
+- Password must be 8-16 chars with uppercase + special character
+- Address maximum 400 characters
+- Rating must be 1-5
+
+## License
+
+ISC**JWT Authentication**: Secure token-based authentication 3. **Input Validation**: Comprehensive validation using express-validator 4. **SQL Injection Prevention**: Parameterized queries with pg library 5. **Role-Based Access Control**: Middleware-based authorization 6. **Token Blacklisting**: Logout functionality with invalidated tokens
 
 ## Error Handling
 
